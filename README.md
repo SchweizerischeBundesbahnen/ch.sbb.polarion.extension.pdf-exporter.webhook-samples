@@ -13,6 +13,13 @@ This webhook endpoint can be started using the following command:
 python app/TableCellAutoHeightSetter.py --port=9333
 ```
 
+## Configuration Webhook URL in PDF-exporter:
+
+1. Navigate to: Administration ➙ PDF Export ➙ Webhooks
+
+2. Add the webhook URL, such as http://host.docker.internal:9333/process.
+
+
 
 
 
