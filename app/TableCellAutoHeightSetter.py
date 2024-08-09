@@ -12,7 +12,7 @@ app = Flask(__name__)
 def process_html():
     html_content = request.form.get('html')
     if html_content:
-        pattern = r'(<t[dh].+?height:.*?)(\d+px)'
+        pattern = r'(<t[dh].+?height:.*?)(\d+(\.\d+)?px)'
         html_content = re.sub(pattern, lambda m: m.group(1) + "auto", html_content)
 
     response = Response(html_content, mimetype="text/html", status=200)
