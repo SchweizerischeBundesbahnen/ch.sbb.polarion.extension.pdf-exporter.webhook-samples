@@ -1,25 +1,20 @@
-# PDF-exporter webhook samples
+# PDF-Exporter Webhook Samples
 
-This project includes samples of webhooks that can incorporate additional logic for processing HTML prior to PDF generation.
-Webhook can be implemented as a REST endpoint by any programming language (Java, JS, Python etc.) and be hosted anywhere (within Polarion as an extension, or absolutely external).
+This project contains examples of webhooks that can include additional logic to process HTML prior to PDF generation.
+Webhooks can be implemented as a REST endpoint by any programming language (Java, JS, Python, etc.) and hosted anywhere (inside Polarion as an extension or completely external).
 
 ## TableCellAutoHeightSetter
 
-The TableCellAutHeightSetter webhook processes HTML content by replacing table cell height values specified in pixels (e.g., height: 100px) with height: auto. The processed HTML is then returned as a response to the client.
+The TableCellAutHeightSetter webhook processes HTML content by replacing table cell height values specified in pixels (e.g. height: 100px) with height: auto. The processed HTML is then returned as a response to the client.
 
 ## Usage
-This webhook endpoint can be started using the following command:
+This webhook endpoint can be launched with the following command:
+
 ```bash
-python app/TableCellAutoHeightSetter.py --port=9333
+python table-cell-auto-height-setter/table_cell_auto_height_setter.py --port=9333
 ```
 
-## Configuration Webhook URL in PDF-exporter:
+## Configuration of the webhook URL in the PDF Exporter:
 
-1. Navigate to: Administration ➙ PDF Export ➙ Webhooks
-
-2. Add the webhook URL, such as http://host.docker.internal:9333/process.
-
-
-
-
-
+1. Navigate to: `Administration` ➙ `PDF Export` ➙ `Webhooks`
+2. Add the webhook URL, for example http://localhost:9333/td-height/auto.
