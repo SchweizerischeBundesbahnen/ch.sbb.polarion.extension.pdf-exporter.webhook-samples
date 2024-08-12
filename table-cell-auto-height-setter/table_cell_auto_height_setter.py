@@ -1,7 +1,7 @@
 import argparse
 import logging
 import re
-from flask import Flask, Response, request, json
+from flask import Flask, Response, request, json, abort
 from gevent.pywsgi import WSGIServer
 
 app = Flask(__name__)
@@ -32,13 +32,13 @@ def change_height(html, height):
 def validate_request():
     export_params_json = request.form.get('exportParams')
     if export_params_json is None:
-        return "Missing exportParams", 400
+        abort(Response('Missing exportParams', 400))
     else:
         export_params_json = json.loads(export_params_json)
 
     html = request.form.get('html')
     if html is None:
-        return "Missing html", 400
+        abort(Response('Missing html', 400))
     return export_params_json, html
 
 
