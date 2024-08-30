@@ -11,8 +11,11 @@ The TableCellAutHeightSetter webhook processes HTML content by replacing table c
 This webhook endpoint can be launched with the following command:
 
 ```bash
-python table-cell-auto-height-setter/table_cell_auto_height_setter.py --port=9333
+python table-cell-auto-height-setter/table_cell_auto_height_setter.py [--port PORT] [--username USERNAME] [--password PASSWORD]
 ```
+
+Optional `--port` parameter is using for changing of listening port.
+Optional `--username` and `--password` parameters are using for basic auth.
 
 ## Configuration of the webhook URL in the PDF Exporter:
 
