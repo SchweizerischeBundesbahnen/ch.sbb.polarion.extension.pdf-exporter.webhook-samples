@@ -1,4 +1,5 @@
 ###### Requirements without Version Specifiers ######
-flask
-gevent
-
+flask~=3.0.3
+gevent~=24.2.1
+Werkzeug~=3.0.3
+Flask-HTTPAuth~=4.8.0
