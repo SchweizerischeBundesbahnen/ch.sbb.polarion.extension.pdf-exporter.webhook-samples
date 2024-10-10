@@ -1,5 +1,5 @@
 ###### Requirements without Version Specifiers ######
 flask~=3.0.3
-gevent~=24.2.1
+gevent~=24.10.1
 Werkzeug~=3.0.3
 Flask-HTTPAuth~=4.8.0
