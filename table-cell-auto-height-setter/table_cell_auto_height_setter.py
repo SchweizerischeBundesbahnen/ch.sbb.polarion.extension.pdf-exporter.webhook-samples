@@ -1,4 +1,3 @@
-# nosec: py/reflective-xss
 import argparse
 import logging
 import re
@@ -37,13 +36,8 @@ def process_html(height):
     else:
         logging.info("'fitToPage' is not set. Changing HTML table cell height skipped.")
 
-    # we ignore 'py/reflective-xss' ("Directly writing user input to
-    # response without properly sanitizing the input first, allows
-    # for a cross-site scripting vulnerability") and 'pythonsecurity:S5131'
-    # ("Change this code to not reflect user-controlled data") because
-    # this is exactly what we supposed to do - return slightly modified
-    # but basically the same html
-    return Response(html, mimetype="text/html", status=200) # nosec: py/reflective-xss
+    # new attempt to hide response html
+    return Response(bytes(html, "utf-8"), mimetype="application/octet-stream", status=200)
 
 
 def change_height(html, height):
