@@ -1,4 +1,3 @@
-# nosec: py/reflective-xss
 import argparse
 import logging
 import re
