@@ -1,3 +1,5 @@
+# sonarcloud-ignore py/reflective-xss
+# pythonsecurity:S5131
 import argparse
 import logging
 import re
@@ -42,7 +44,7 @@ def process_html(height):
     # ("Change this code to not reflect user-controlled data") because
     # this is exactly what we supposed to do - return slightly modified
     # but basically the same html
-    return Response(html, mimetype="text/html", status=200) # sonarcloud-ignore py/reflective-xss, pythonsecurity:S5131
+    return Response(html, mimetype="text/html", status=200)
 
 
 def change_height(html, height):
