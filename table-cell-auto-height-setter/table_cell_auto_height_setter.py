@@ -8,16 +8,20 @@ from gevent.pywsgi import WSGIServer
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-auth = HTTPBasicAuth()
-users = {
-    "username1": generate_password_hash("userpass1"),
-    "username2": generate_password_hash("userpass2")
-}
 
+data_limit = 100 * 1024 * 1024  # 100MB;
+app.config.update(
+    MAX_CONTENT_LENGTH=data_limit,
+    MAX_FORM_MEMORY_SIZE=data_limit,
+)
+
+auth = HTTPBasicAuth()
+service_username = None
+service_password_hash = None
 
 @auth.verify_password
 def verify_password(username, password):
-    if username in users and check_password_hash(users.get(username), password):
+    if username == service_username and check_password_hash(service_password_hash, password):
         return username
     return None
 
@@ -30,6 +34,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] - %
 def process_html(height):
     export_params, html = validate_request()
 
+    height = sanitize_input(height)
     logging.info(f"Changing HTML table cell height to '{height}'")
 
     if export_params.get('fitToPage'):
@@ -38,11 +43,11 @@ def process_html(height):
     else:
         logging.info("'fitToPage' is not set. Changing HTML table cell height skipped.")
 
-    return Response(html, mimetype="text/html", status=200)
+    return Response(bytes(html, "utf-8"), mimetype="application/octet-stream", status=200)
 
 
 def change_height(html, height):
-    pattern = r'(<t[dh].+?height:.*?)(\d+(\.\d+)?px)'
+    pattern = r'(<t[dh][^>]{0,100}?style=[^>]{0,100}?height:\s*)(\d+(?:\.\d+)?px)'
     return re.sub(pattern, lambda m: m.group(1) + height, html)
 
 
@@ -58,19 +63,22 @@ def validate_request():
         abort(Response('Missing html', 400))
     return export_params_json, html
 
+def sanitize_input(user_input):
+    return re.sub(r'[\r\n]', '', user_input).strip()
 
 def start_server(port):
-    http_server = WSGIServer(("", port), app)
+    http_server = WSGIServer(("localhost", port), app)
     http_server.serve_forever()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Webhook: table cell auto height setter")
     parser.add_argument('--port', default=9333, type=int, required=False, help="service port")
-    parser.add_argument('--username', type=str, required=False, help='username for basic auth')
-    parser.add_argument('--password', type=str, required=False, help='password for basic auth')
+    parser.add_argument('--username', type=str, required=True, help='username for basic auth')
+    parser.add_argument('--password', type=str, required=True, help='password for basic auth')
     args = parser.parse_args()
-
+    service_username = args.username
+    service_password_hash = generate_password_hash(args.password)
     logging.info(f"Service listening on port: {args.port}")
 
     start_server(args.port)
