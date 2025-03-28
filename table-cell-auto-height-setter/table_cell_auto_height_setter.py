@@ -1,5 +1,4 @@
-# sonarcloud-ignore py/reflective-xss
-# pythonsecurity:S5131
+# nosec: py/reflective-xss
 import argparse
 import logging
 import re
