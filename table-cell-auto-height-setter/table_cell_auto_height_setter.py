@@ -64,7 +64,11 @@ def validate_request():
     return export_params_json, html
 
 def sanitize_input(user_input):
-    return re.sub(r'[\r\n]', '', user_input).strip()
+    user_input = re.sub(r'[\r\n]', '', user_input).strip()
+    # Allow only integer + units of measure and 'auto'
+    if user_input == "auto" or re.fullmatch(r'\d{1,4}(px|em|%)', user_input):
+        return user_input
+    raise ValueError("Invalid height value")
 
 def start_server(port):
     http_server = WSGIServer(("localhost", port), app)
