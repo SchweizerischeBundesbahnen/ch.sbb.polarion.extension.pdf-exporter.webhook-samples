@@ -34,11 +34,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] - %
 def process_html(height):
     export_params, html = validate_request()
 
-    height = sanitize_input(height)
-    logging.info(f"Changing HTML table cell height to '{height}'")
-
     if export_params.get('fitToPage'):
-        html = change_height(html, height)
+        html = change_height(html, sanitize_input(height))
         logging.info("Changing HTML table cell height finished.")
     else:
         logging.info("'fitToPage' is not set. Changing HTML table cell height skipped.")
