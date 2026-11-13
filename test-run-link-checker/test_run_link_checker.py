@@ -58,21 +58,22 @@ def check_links():
 
     document_type = export_params.get('documentType')
     if document_type != 'TEST_RUN':
-        logging.info(f"Document type is '{document_type}', not a test run. Link check skipped.")
+        logging.info(f"Document type is '{single_line(document_type)}', not a test run. Link check skipped.")
         return html_response(html)
 
     project_id = export_params.get('projectId')
     test_run_id = (export_params.get('urlQueryParameters') or {}).get(TEST_RUN_ID_PARAM)
     if not project_id or not test_run_id:
         # The export cannot be checked, and a check which silently does nothing is worse than a refusal.
-        abort(Response("Cannot check the test run: the export parameters name no project or test run id", 400))
+        abort(plain_response("Cannot check the test run: the export parameters name no project or test run id", 400))
 
+    run = f"{single_line(project_id)}/{single_line(test_run_id)}"
     issues = scan_test_run(project_id, test_run_id, revision_of(export_params))
     if issues:
-        logging.warning(f"Test run '{project_id}/{test_run_id}' has {len(issues)} broken link(s). Export refused.")
-        abort(Response(refusal_text(project_id, test_run_id, issues), 422))
+        logging.warning(f"Test run '{run}' has {len(issues)} broken link(s). Export refused.")
+        abort(plain_response(refusal_text(project_id, test_run_id, issues), 422))
 
-    logging.info(f"Test run '{project_id}/{test_run_id}' has no broken links. Export allowed.")
+    logging.info(f"Test run '{run}' has no broken links. Export allowed.")
     return html_response(html)
 
 
@@ -103,16 +104,18 @@ def scan_test_run(project_id, test_run_id, revision):
         )
     except requests.RequestException as e:
         # Reaching no verdict is not the same as a clean test run, so the export is refused too.
-        abort(Response(f"Cannot check the test run: the XML Repair service could not be called: {e}", 502))
-    else:
-        if response.status_code != 200:
-            abort(Response(f"Cannot check the test run: the XML Repair service answered "
-                           f"HTTP {response.status_code}: {response.text[:500]}", 502))
+        # Only the kind of the failure is reported: the exception text carries the scan URL and the token header.
+        abort(plain_response(f"Cannot check the test run: the XML Repair service could not be called "
+                             f"({type(e).__name__})", 502))
 
-        issues = []
-        for item in response.json().get('items', []):
-            issues.extend(issue.get('description', '') for issue in item.get('issues', []))
-        return issues
+    if response.status_code != 200:
+        abort(plain_response(f"Cannot check the test run: the XML Repair service answered "
+                             f"HTTP {response.status_code}", 502))
+
+    issues = []
+    for item in response.json().get('items', []):
+        issues.extend(issue.get('description', '') for issue in item.get('issues', []))
+    return issues
 
 
 def refusal_text(project_id, test_run_id, issues):
@@ -127,6 +130,16 @@ def refusal_text(project_id, test_run_id, issues):
 
 def html_response(html):
     return Response(bytes(html, "utf-8"), mimetype="application/octet-stream", status=200)
+
+
+def plain_response(text, status):
+    """A message for the user, never HTML: it carries ids and descriptions which come from the request."""
+    return Response(text, mimetype="text/plain", status=status)
+
+
+def single_line(value):
+    """A value of the request kept out of the line structure of the log."""
+    return str(value).replace('\r', ' ').replace('\n', ' ')
 
 
 def validate_request():
