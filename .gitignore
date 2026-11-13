@@ -5,3 +5,6 @@
 .idea/codeStyles/*
 !.idea/codeStyles/Project.xml
 !.idea/codeStyles/codeStyleConfig.xml
+
+# python bytecode
+__pycache__/
