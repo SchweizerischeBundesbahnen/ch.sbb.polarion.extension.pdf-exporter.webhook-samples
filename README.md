@@ -41,12 +41,19 @@ for every document type.
 
 ### Usage
 
-The webhook reads a Polarion personal access token from the `POLARION_TOKEN` environment variable. It is kept out of
-the command line, where it would reach the process list and the shell history. The scan runs with the permissions of
-that token's user, which is therefore the user whose read access decides whether a link counts as broken.
+The webhook reads two secrets from environment variables. They are kept out of the command line, where they would
+reach the process list and the shell history.
+
+- `WEBHOOK_PASSWORD` is the password for basic auth.
+- `POLARION_TOKEN` is a Polarion personal access token. The scan runs with the permissions of that token's user, which
+  is therefore the user whose read access decides whether a link counts as broken.
+
+Each `read` command waits for a secret and does not show it:
 
 ```bash
-POLARION_TOKEN=<token> python test-run-link-checker/test_run_link_checker.py --username USERNAME --password PASSWORD [--port PORT] [--polarion-url URL] [--scan-timeout SECONDS]
+read -rs WEBHOOK_PASSWORD && export WEBHOOK_PASSWORD
+read -rs POLARION_TOKEN && export POLARION_TOKEN
+python test-run-link-checker/test_run_link_checker.py --username USERNAME [--port PORT] [--polarion-url URL] [--scan-timeout SECONDS]
 ```
 
 Optional `--port` parameter changes the listening port, 9334 by default.
