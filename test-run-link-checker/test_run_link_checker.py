@@ -15,6 +15,7 @@ monkey.patch_socket()
 monkey.patch_ssl()
 
 import argparse  # noqa: E402
+import getpass  # noqa: E402
 import logging  # noqa: E402
 import os  # noqa: E402
 
@@ -193,9 +194,12 @@ def start_server(port):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Webhook: test run link checker")
+    # Without allow_abbrev=False, "--password secret" would be accepted as "--password-env secret".
+    parser = argparse.ArgumentParser(description="Webhook: test run link checker", allow_abbrev=False)
     parser.add_argument('--port', default=9334, type=int, required=False, help="service port")
     parser.add_argument('--username', type=str, required=True, help='username for basic auth')
+    parser.add_argument('--password-env', type=str, default='SERVICE_PASSWORD', required=False,
+                        help='environment variable containing password for basic auth')
     parser.add_argument('--polarion-url', type=str, default='http://localhost', required=False,
                         help='base URL of Polarion, without the /polarion path')
     parser.add_argument('--scan-timeout', default=120, type=int, required=False,
@@ -206,14 +210,17 @@ if __name__ == '__main__':
     scan_timeout = args.scan_timeout
 
     # The secrets are kept out of the command line, where they would reach the process list and the shell history.
-    service_password = os.environ.get('WEBHOOK_PASSWORD')
-    if not service_password:
-        parser.error('Environment variable WEBHOOK_PASSWORD must hold the password for basic auth')
-    service_password_hash = generate_password_hash(service_password)
-
     polarion_token = os.environ.get('POLARION_TOKEN')
     if not polarion_token:
         parser.error('Environment variable POLARION_TOKEN must hold a Polarion personal access token')
+
+    service_password = os.environ.get(args.password_env)
+    if service_password is None:
+        try:
+            service_password = getpass.getpass('Basic auth password: ')
+        except EOFError:
+            parser.error(f'No terminal to enter the password: set environment variable {args.password_env}')
+    service_password_hash = generate_password_hash(service_password)
 
     logging.info(f"Service listening on port: {args.port}, checking test runs through {polarion_url}")
 
