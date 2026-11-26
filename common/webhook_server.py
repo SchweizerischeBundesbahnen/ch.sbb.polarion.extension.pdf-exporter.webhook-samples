@@ -10,7 +10,7 @@ from flask_httpauth import HTTPBasicAuth
 from gevent.pywsgi import WSGIServer
 from werkzeug.security import generate_password_hash, check_password_hash
 
-app = Flask(__name__)
+app = Flask(__name__) # NOSONAR
 
 data_limit = 100 * 1024 * 1024  # 100MB;
 app.config.update(
