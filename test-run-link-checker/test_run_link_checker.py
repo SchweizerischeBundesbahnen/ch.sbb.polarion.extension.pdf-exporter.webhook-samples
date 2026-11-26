@@ -8,27 +8,26 @@ The check itself belongs to the XML Repair extension, whose TestRunBrokenLinksRe
 test case and defect references of a test run which cannot be resolved or read.
 """
 
-import argparse
-import logging
-import os
+# The patch must precede the other imports: without it a pending scan blocks every other request.
+from gevent import monkey
 
-import requests
-from flask import Flask, Response, request, json, abort
-from flask_httpauth import HTTPBasicAuth
-from gevent.pywsgi import WSGIServer
-from werkzeug.security import generate_password_hash, check_password_hash
+monkey.patch_socket()
+monkey.patch_ssl()
 
-app = Flask(__name__)
+import logging  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-data_limit = 100 * 1024 * 1024  # 100MB;
-app.config.update(
-    MAX_CONTENT_LENGTH=data_limit,
-    MAX_FORM_MEMORY_SIZE=data_limit,
+import requests  # noqa: E402
+from flask import abort  # noqa: E402
+
+# The shared module is in the repository root, next to the folder of this sample.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from common.webhook_server import (  # noqa: E402
+    app, auth, validate_request, html_response, plain_response, create_parser, configure_auth, start_server,
 )
-
-auth = HTTPBasicAuth()
-service_username = None
-service_password_hash = None
 
 polarion_url = None
 polarion_token = None
@@ -39,16 +38,6 @@ REPAIRER = "TestRunBrokenLinksRepairer"
 # The export dialog puts the test run id here; a test run has no location path.
 TEST_RUN_ID_PARAM = "id"
 MAX_REPORTED_ISSUES = 20
-
-
-@auth.verify_password
-def verify_password(username, password):
-    if username == service_username and check_password_hash(service_password_hash, password):
-        return username
-    return None
-
-
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] - %(message)s')
 
 
 @app.route("/test-run/check-links", methods=["POST"])
@@ -62,7 +51,8 @@ def check_links():
         return html_response(html)
 
     project_id = export_params.get('projectId')
-    test_run_id = (export_params.get('urlQueryParameters') or {}).get(TEST_RUN_ID_PARAM)
+    query_params = export_params.get('urlQueryParameters')
+    test_run_id = query_params.get(TEST_RUN_ID_PARAM) if isinstance(query_params, dict) else None
     if not project_id or not test_run_id:
         # The export cannot be checked, and a check which silently does nothing is worse than a refusal.
         abort(plain_response("Cannot check the test run: the export parameters name no project or test run id", 400))
@@ -112,10 +102,30 @@ def scan_test_run(project_id, test_run_id, revision):
         abort(plain_response(f"Cannot check the test run: the XML Repair service answered "
                              f"HTTP {response.status_code}", 502))
 
+    try:
+        return issue_descriptions(response.json())
+    except ValueError:
+        # A malformed result is no verdict either.
+        abort(plain_response("Cannot check the test run: the XML Repair service returned an invalid scan result", 502))
+
+
+def issue_descriptions(scan_result):
+    """The descriptions of all issues in a scan result. Raises ValueError if its structure is not the expected one."""
     issues = []
-    for item in response.json().get('items', []):
-        issues.extend(issue.get('description', '') for issue in item.get('issues', []))
+    for item in list_field(scan_result, 'items'):
+        for issue in list_field(item, 'issues'):
+            description = issue.get('description') if isinstance(issue, dict) else None
+            if not isinstance(description, str):
+                raise ValueError("An issue has no description")
+            issues.append(description)
     return issues
+
+
+def list_field(value, name):
+    field = value.get(name) if isinstance(value, dict) else None
+    if not isinstance(field, list):
+        raise ValueError(f"Field '{name}' is not a list")
+    return field
 
 
 def refusal_text(project_id, test_run_id, issues):
@@ -128,57 +138,27 @@ def refusal_text(project_id, test_run_id, issues):
     return "\n".join(lines)
 
 
-def html_response(html):
-    return Response(bytes(html, "utf-8"), mimetype="application/octet-stream", status=200)
-
-
-def plain_response(text, status):
-    """A message for the user, never HTML: it carries ids and descriptions which come from the request."""
-    return Response(text, mimetype="text/plain", status=status)
-
-
 def single_line(value):
     """A value of the request kept out of the line structure of the log."""
     return str(value).replace('\r', ' ').replace('\n', ' ')
 
 
-def validate_request():
-    export_params_json = request.form.get('exportParams')
-    if export_params_json is None:
-        abort(Response('Missing exportParams', 400))
-    else:
-        export_params_json = json.loads(export_params_json)
-
-    html = request.form.get('html')
-    if html is None:
-        abort(Response('Missing html', 400))
-    return export_params_json, html
-
-
-def start_server(port):
-    http_server = WSGIServer(("localhost", port), app)
-    http_server.serve_forever()
-
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Webhook: test run link checker")
-    parser.add_argument('--port', default=9334, type=int, required=False, help="service port")
-    parser.add_argument('--username', type=str, required=True, help='username for basic auth')
-    parser.add_argument('--password', type=str, required=True, help='password for basic auth')
+    parser = create_parser("Webhook: test run link checker", 9334)
     parser.add_argument('--polarion-url', type=str, default='http://localhost', required=False,
                         help='base URL of Polarion, without the /polarion path')
     parser.add_argument('--scan-timeout', default=120, type=int, required=False,
                         help='seconds to wait for the scan')
     args = parser.parse_args()
-    service_username = args.username
-    service_password_hash = generate_password_hash(args.password)
     polarion_url = args.polarion_url.rstrip('/')
     scan_timeout = args.scan_timeout
 
-    # Kept out of the command line, where it would reach the process list and the shell history.
+    # The token is kept out of the command line, where it would reach the process list and the shell history.
     polarion_token = os.environ.get('POLARION_TOKEN')
     if not polarion_token:
         parser.error('Environment variable POLARION_TOKEN must hold a Polarion personal access token')
+
+    configure_auth(parser, args)
 
     logging.info(f"Service listening on port: {args.port}, checking test runs through {polarion_url}")
 

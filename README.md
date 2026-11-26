@@ -3,6 +3,9 @@
 This project contains examples of webhooks that can include additional logic to process HTML prior to PDF generation.
 Webhooks can be implemented as a REST endpoint by any programming language (Java, JS, Python, etc.) and hosted anywhere (inside Polarion as an extension or completely external).
 
+Each sample needs the `common` folder of this repository, which holds the code that all samples share.
+To use a sample elsewhere, copy its folder together with the `common` folder.
+
 ## TableCellAutoHeightSetter
 
 The TableCellAutHeightSetter webhook processes HTML content by replacing table cell height values specified in pixels (e.g. height: 100px) with height: auto. The processed HTML is then returned as a response to the client.
@@ -11,11 +14,13 @@ The TableCellAutHeightSetter webhook processes HTML content by replacing table c
 This webhook endpoint can be launched with the following command:
 
 ```bash
-python table-cell-auto-height-setter/table_cell_auto_height_setter.py [--port PORT] [--username USERNAME] [--password PASSWORD]
+python table-cell-auto-height-setter/table_cell_auto_height_setter.py --username USERNAME [--password-env NAME] [--port PORT]
 ```
 
-Optional `--port` parameter is using for changing of listening port.
-Optional `--username` and `--password` parameters are using for basic auth.
+The `--username` parameter is the username for basic auth.
+Optional `--password-env` parameter is the name of the variable with the basic auth password, `SERVICE_PASSWORD` by default.
+If the variable is not set, the webhook asks for the password at startup.
+Optional `--port` parameter changes the listening port, 9333 by default.
 
 ## Configuration of the webhook URL in the PDF Exporter:
 
@@ -41,14 +46,21 @@ for every document type.
 
 ### Usage
 
-The webhook reads a Polarion personal access token from the `POLARION_TOKEN` environment variable. It is kept out of
-the command line, where it would reach the process list and the shell history. The scan runs with the permissions of
-that token's user, which is therefore the user whose read access decides whether a link counts as broken.
+The webhook reads two secrets from environment variables. They are kept out of the command line, where they would
+reach the process list and the shell history.
+
+- `SERVICE_PASSWORD` is the password for basic auth. If it is not set, the webhook asks for the password at startup.
+- `POLARION_TOKEN` is a Polarion personal access token. The scan runs with the permissions of that token's user, which
+  is therefore the user whose read access decides whether a link counts as broken.
+
+The `read` command waits for the token and does not show it:
 
 ```bash
-POLARION_TOKEN=<token> python test-run-link-checker/test_run_link_checker.py --username USERNAME --password PASSWORD [--port PORT] [--polarion-url URL] [--scan-timeout SECONDS]
+read -rs POLARION_TOKEN && export POLARION_TOKEN
+python test-run-link-checker/test_run_link_checker.py --username USERNAME [--password-env NAME] [--port PORT] [--polarion-url URL] [--scan-timeout SECONDS]
 ```
 
+Optional `--password-env` parameter is the name of the variable with the basic auth password, `SERVICE_PASSWORD` by default.
 Optional `--port` parameter changes the listening port, 9334 by default.
 Optional `--polarion-url` parameter is the base URL of Polarion without the `/polarion` path, `http://localhost` by default.
 Optional `--scan-timeout` parameter is the number of seconds to wait for the scan, 120 by default.
