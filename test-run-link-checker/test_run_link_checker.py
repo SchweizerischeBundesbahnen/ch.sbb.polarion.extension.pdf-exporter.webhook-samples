@@ -14,28 +14,20 @@ from gevent import monkey
 monkey.patch_socket()
 monkey.patch_ssl()
 
-import argparse  # noqa: E402
-import getpass  # noqa: E402
 import logging  # noqa: E402
 import os  # noqa: E402
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 import requests  # noqa: E402
-from flask import Flask, Response, request, json, abort  # noqa: E402
-from flask_httpauth import HTTPBasicAuth  # noqa: E402
-from gevent.pywsgi import WSGIServer  # noqa: E402
-from werkzeug.security import generate_password_hash, check_password_hash  # noqa: E402
+from flask import abort  # noqa: E402
 
-app = Flask(__name__)
+# The shared module is in the repository root, next to the folder of this sample.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-data_limit = 100 * 1024 * 1024  # 100MB;
-app.config.update(
-    MAX_CONTENT_LENGTH=data_limit,
-    MAX_FORM_MEMORY_SIZE=data_limit,
+from common.webhook_server import (  # noqa: E402
+    app, auth, validate_request, html_response, plain_response, create_parser, configure_auth, start_server,
 )
-
-auth = HTTPBasicAuth()
-service_username = None
-service_password_hash = None
 
 polarion_url = None
 polarion_token = None
@@ -46,16 +38,6 @@ REPAIRER = "TestRunBrokenLinksRepairer"
 # The export dialog puts the test run id here; a test run has no location path.
 TEST_RUN_ID_PARAM = "id"
 MAX_REPORTED_ISSUES = 20
-
-
-@auth.verify_password
-def verify_password(username, password):
-    if username == service_username and check_password_hash(service_password_hash, password):
-        return username
-    return None
-
-
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] - %(message)s')
 
 
 @app.route("/test-run/check-links", methods=["POST"])
@@ -156,71 +138,27 @@ def refusal_text(project_id, test_run_id, issues):
     return "\n".join(lines)
 
 
-def html_response(html):
-    return Response(bytes(html, "utf-8"), mimetype="application/octet-stream", status=200)
-
-
-def plain_response(text, status):
-    """A message for the user, never HTML: it carries ids and descriptions which come from the request."""
-    return Response(text, mimetype="text/plain", status=status)
-
-
 def single_line(value):
     """A value of the request kept out of the line structure of the log."""
     return str(value).replace('\r', ' ').replace('\n', ' ')
 
 
-def validate_request():
-    export_params_json = request.form.get('exportParams')
-    if export_params_json is None:
-        abort(plain_response('Missing exportParams', 400))
-
-    try:
-        export_params = json.loads(export_params_json)
-    except ValueError:
-        abort(plain_response('Invalid exportParams: not valid JSON', 400))
-    if not isinstance(export_params, dict):
-        abort(plain_response('Invalid exportParams: not a JSON object', 400))
-
-    html = request.form.get('html')
-    if html is None:
-        abort(plain_response('Missing html', 400))
-    return export_params, html
-
-
-def start_server(port):
-    http_server = WSGIServer(("localhost", port), app)
-    http_server.serve_forever()
-
-
 if __name__ == '__main__':
-    # Without allow_abbrev=False, "--password secret" would be accepted as "--password-env secret".
-    parser = argparse.ArgumentParser(description="Webhook: test run link checker", allow_abbrev=False)
-    parser.add_argument('--port', default=9334, type=int, required=False, help="service port")
-    parser.add_argument('--username', type=str, required=True, help='username for basic auth')
-    parser.add_argument('--password-env', type=str, default='SERVICE_PASSWORD', required=False,
-                        help='environment variable containing password for basic auth')
+    parser = create_parser("Webhook: test run link checker", 9334)
     parser.add_argument('--polarion-url', type=str, default='http://localhost', required=False,
                         help='base URL of Polarion, without the /polarion path')
     parser.add_argument('--scan-timeout', default=120, type=int, required=False,
                         help='seconds to wait for the scan')
     args = parser.parse_args()
-    service_username = args.username
     polarion_url = args.polarion_url.rstrip('/')
     scan_timeout = args.scan_timeout
 
-    # The secrets are kept out of the command line, where they would reach the process list and the shell history.
+    # The token is kept out of the command line, where it would reach the process list and the shell history.
     polarion_token = os.environ.get('POLARION_TOKEN')
     if not polarion_token:
         parser.error('Environment variable POLARION_TOKEN must hold a Polarion personal access token')
 
-    service_password = os.environ.get(args.password_env)
-    if service_password is None:
-        try:
-            service_password = getpass.getpass('Basic auth password: ')
-        except EOFError:
-            parser.error(f'No terminal to enter the password: set environment variable {args.password_env}')
-    service_password_hash = generate_password_hash(service_password)
+    configure_auth(parser, args)
 
     logging.info(f"Service listening on port: {args.port}, checking test runs through {polarion_url}")
 

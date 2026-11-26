@@ -3,6 +3,9 @@
 This project contains examples of webhooks that can include additional logic to process HTML prior to PDF generation.
 Webhooks can be implemented as a REST endpoint by any programming language (Java, JS, Python, etc.) and hosted anywhere (inside Polarion as an extension or completely external).
 
+Each sample needs the `common` folder of this repository, which holds the code that all samples share.
+To use a sample elsewhere, copy its folder together with the `common` folder.
+
 ## TableCellAutoHeightSetter
 
 The TableCellAutHeightSetter webhook processes HTML content by replacing table cell height values specified in pixels (e.g. height: 100px) with height: auto. The processed HTML is then returned as a response to the client.
